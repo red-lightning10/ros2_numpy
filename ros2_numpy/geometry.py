@@ -1,12 +1,34 @@
 from .registry import converts_from_numpy, converts_to_numpy
 from geometry_msgs.msg import Transform, Vector3, Quaternion, Point, Pose
-import tf_transformations as transformations
+# removed tf_transformations as transformations, due to compatibility issues with numpy>2
 from . import numpify
-
 import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+# numpy utils
+def translation_matrix(translation):
+    """ Create a translation matrix """
+    matrix = np.eye(4)
+    matrix[:3, 3] = translation
+    return matrix
+
+def quaternion_matrix(quaternion):
+    """ Create a rotation matrix from a quaternion """
+    r = R.from_quat(quaternion)
+    matrix = np.eye(4)
+    matrix[:3, :3] = r.as_matrix()
+    return matrix
+
+def translation_from_matrix(matrix):
+    """ Extract translation from transformation matrix """
+    return matrix[:3, 3]
+
+def quaternion_from_matrix(matrix):
+    """ Extract quaternion from transformation matrix """
+    r = R.from_matrix(matrix[:3, :3])
+    return r.as_quat()
 
 # basic types
-
 @converts_to_numpy(Vector3)
 def vector3_to_numpy(msg, hom=False):
     if hom:
@@ -67,8 +89,8 @@ def numpy_to_quat(arr):
 @converts_to_numpy(Transform)
 def transform_to_numpy(msg):
     return np.dot(
-        transformations.translation_matrix(numpify(msg.translation)),
-        transformations.quaternion_matrix(numpify(msg.rotation))
+        translation_matrix(numpify(msg.translation)),
+        quaternion_matrix(numpify(msg.rotation))
     )
 
 @converts_from_numpy(Transform)
@@ -77,9 +99,8 @@ def numpy_to_transform(arr):
     assert rest == (4,4)
 
     if len(shape) == 0:
-        trans = transformations.translation_from_matrix(arr)
-        quat = transformations.quaternion_from_matrix(arr)
-
+        trans = translation_from_matrix(arr)
+        quat = quaternion_from_matrix(arr)
         return Transform(
             translation=Vector3(**dict(zip(['x', 'y', 'z'], trans))),
             rotation=Quaternion(**dict(zip(['x', 'y', 'z', 'w'], quat)))
@@ -91,18 +112,17 @@ def numpy_to_transform(arr):
                 translation=Vector3(
                     **dict(
                         zip(['x', 'y', 'z'],
-                        transformations.translation_from_matrix(arr[idx])))),
+                        translation_from_matrix(arr[idx])))),
                 rotation=Quaternion(
                     **dict(
                         zip(['x', 'y', 'z', 'w'],
-                        transformations.quaternion_from_matrix(arr[idx]))))
+                        quaternion_from_matrix(arr[idx]))))
             )
-
 @converts_to_numpy(Pose)
 def pose_to_numpy(msg):
     return np.dot(
-        transformations.translation_matrix(numpify(msg.position)),
-        transformations.quaternion_matrix(numpify(msg.orientation))
+        translation_matrix(numpify(msg.position)),
+        quaternion_matrix(numpify(msg.orientation))
     )
 
 @converts_from_numpy(Pose)
@@ -111,8 +131,8 @@ def numpy_to_pose(arr):
     assert rest == (4,4)
 
     if len(shape) == 0:
-        trans = transformations.translation_from_matrix(arr)
-        quat = transformations.quaternion_from_matrix(arr)
+        trans = translation_from_matrix(arr)
+        quat = quaternion_from_matrix(arr)
 
         return Pose(
             position=Point(**dict(zip(['x', 'y', 'z'], trans))),
@@ -125,9 +145,9 @@ def numpy_to_pose(arr):
                 position=Point(
                     **dict(
                         zip(['x', 'y', 'z'],
-                        transformations.translation_from_matrix(arr[idx])))),
+                        translation_from_matrix(arr[idx])))),
                 orientation=Quaternion(
                     **dict(
                         zip(['x', 'y', 'z', 'w'],
-                        transformations.quaternion_from_matrix(arr[idx]))))
+                        quaternion_from_matrix(arr[idx]))))
             )
